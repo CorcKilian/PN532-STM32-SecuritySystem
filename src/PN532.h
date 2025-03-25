@@ -14,6 +14,9 @@ bool PN532_readResponse(uint8_t *data_out, uint8_t *data_len_out);
 bool PN532_readACK(void);
 void delayPN_ms(uint32_t ms);
 void delayPN(volatile uint32_t dly);
+void read_SPIcontrol_register(void);
+
+
 typedef struct {
     uint8_t nb_targets;        // Number of tags detected
     uint8_t target_number;     // Tag ID assigned by PN532

@@ -65,6 +65,8 @@ int main(void) {
             printf("Data[%d] = 0x%02X\n", i, rx_buf[i]);
         }
     }
+    
+    read_SPIcontrol_register();
 
     // End initialisation of SAM
     SystemState state = STATE_WAIT_INPUT;

@@ -312,3 +312,79 @@ void delayPN_ms(uint32_t ms) {
         __NOP(); // Prevent compiler optimization
     }
 }
+
+/**
+ * read_SPIcontrol_register
+ *
+ * Reads the SPIcontrol register (0xFFA9) from the PN532 using the ReadRegister command.
+ * This is useful for checking or debugging the current SPI configuration (e.g., CPOL/CPHA bits).
+ *
+ * The function sends a ReadRegister command frame over SPI, waits for the ACK,
+ * then reads and parses the response. If successful, it prints the register value.
+ *
+ * @note Uses sendCommand(), PN532_readACK(), and PN532_readResponse().
+ * @note Register 0xA9 is part of the internal SFR space, so the high byte is 0xFF.
+ */
+void read_SPIcontrol_register(void) {
+    uint8_t readreg_cmd[] = {
+        PN532_COMMAND_READREGISTER,  // 0x06
+        0xFF,  // High byte of address
+        0xA9   // Low byte of address (SPIcontrol SFR)
+    };
+
+    // Send ReadRegister command
+    sendCommand(readreg_cmd, sizeof(readreg_cmd));
+
+    // Wait for ACK
+    if (!PN532_readACK()) {
+        printf("❌ No ACK for ReadRegister command.\r\n");
+        return;
+    }
+
+    // Read the response
+    uint8_t rx_buf[PN532_MAX_FRAME_LEN] = {0};
+    uint8_t rx_len = 0;
+
+    if (!PN532_readResponse(rx_buf, &rx_len)) {
+        printf("❌ Failed to read response.\r\n");
+        return;
+    }
+
+    if (rx_len >= 2 && rx_buf[0] == PN532_COMMAND_READREGISTER + 1) {
+        printf("✅ SPIcontrol (0xA9) register value: 0x%02X\r\n", rx_buf[1]);
+    } else {
+        printf("⚠️ Unexpected response.\r\n");
+        for (uint8_t i = 0; i < rx_len; i++) {
+            printf("RX[%d] = 0x%02X\r\n", i, rx_buf[i]);
+        }
+    }
+}
+
+/**
+ * write_SPIcontrol_register
+ *
+ * Writes a value to the SPIcontrol register (0xFFA9) using the WriteRegister command.
+ * This lets you change SPI settings like CPOL and CPHA to match other devices.
+ *
+ * Example: Setting value to 0x3F sets SPI Mode 3 (CPOL=1, CPHA=1) with SPI and IRQs enabled.
+ *
+ * @param value The 8-bit value to write to the SPIcontrol register.
+ */
+void write_SPIcontrol_register(uint8_t value) {
+    uint8_t writereg_cmd[] = {
+        PN532_COMMAND_WRITEREGISTER,  // 0x08
+        0x01,      // Number of registers to write
+        0xFF,      // High byte of address
+        0xA9,      // Low byte of address (SPIcontrol)
+        value      // Value to write
+    };
+
+    sendCommand(writereg_cmd, sizeof(writereg_cmd));
+
+    if (!PN532_readACK()) {
+        printf("❌ No ACK for WriteRegister.\r\n");
+        return;
+    }
+
+    printf("✅ Wrote 0x%02X to SPIcontrol (0xA9).\r\n", value);
+}
