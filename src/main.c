@@ -7,7 +7,6 @@
 #include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
 #include "PN532.h"
 #include "auth.h"
-#include "display.h"
 
 void setup(void);
 void delay(volatile uint32_t dly);
@@ -32,21 +31,12 @@ int main(void) {
     GPIOB->ODR |= (1 << 0);   // Pull slave select high
     delay(1000000);           // wait a little bit for everything to be up and running
 
-
     typedef enum {
         STATE_WAIT_INPUT,
         STATE_ADD_UID,
         STATE_AUTH_UID,
-        STATE_REMOVE_UID,
-        STATE_READ_SPIREG,
-        STATE_WRITE_SPIREG
+        STATE_REMOVE_UID
     } SystemState;
-
-
-    c = waitForByte_USART2();
-    printf("We will begin\r\n");
-    sendACK();
-    delay(10000000);
 
     uint8_t sam_cfg[] = {
         PN532_COMMAND_SAMCONFIGURATION,
@@ -62,32 +52,26 @@ int main(void) {
         printf("ACK Read Succesfully.\r\n");
     }
 
-
+    // read Response
     uint8_t rx_buf[PN532_MAX_FRAME_LEN];
     uint8_t rx_len = 0;
 
     // Pn532_readResponse() will return true if successful.
     // It also waits until IRQ is pulled low.
     if (PN532_readResponse(rx_buf, &rx_len)) {
-        printf("SAMConfig verification (0x15 expected):\r\n");
+        c = waitForByte_USART2();
+        printf("Recieved: %c\r\nSAMConfig verification (0x15 expected):\r\n", c);
         for (uint8_t i = 0; i < rx_len; i++) {
             printf("Data[%d] = 0x%02X\n", i, rx_buf[i]);
         }
     }
-    delay(100000);
-
+    
     read_SPIcontrol_register();
 
     // End initialisation of SAM
-
-    write_SPIcontrol_register(0x2C); // this sets the PN532 to SPI mode 3 which the display also uses
-    delay_ms(100);           // wait a little bit for everything to be up and running
-
-    init_display();
     SystemState state = STATE_WAIT_INPUT;
     PN532_TagInfo tag;
-    printTextToggle("    UID Authentication System   ",5,20,RGBToWord(128,255,128),0);
-    
+
     // Enter the main loop
     while (1) {
         switch (state) {
@@ -96,17 +80,13 @@ int main(void) {
                 printf("1. Add UID to Whitelist\r\n");
                 printf("2. Authenticate UID\r\n");
                 printf("3. Remove UID from Whitelist\r\n");
-                printf("4. Read SPIcontrol Register\r\n");
-                printf("5. Write SPIcontrol Register\r\n");
                 printf("Select option: ");
                 char cmd = waitForByte_USART2();
                 printf("%c\r\n", cmd);  // Echo back selection
 
-                if      (cmd == '1') state = STATE_ADD_UID;
+                if (cmd == '1') state = STATE_ADD_UID;
                 else if (cmd == '2') state = STATE_AUTH_UID;
                 else if (cmd == '3') state = STATE_REMOVE_UID;
-                else if (cmd == '4') state = STATE_READ_SPIREG;
-                else if (cmd == '5') state = STATE_WRITE_SPIREG;
                 else {
                     printf("Invalid input.\r\n");
                     state = STATE_WAIT_INPUT;
@@ -145,17 +125,6 @@ int main(void) {
                 }
                 state = STATE_WAIT_INPUT;
                 break;
-
-                case STATE_READ_SPIREG:
-                    read_SPIcontrol_register();
-                    state = STATE_WAIT_INPUT;
-                    break;
-
-                case STATE_WRITE_SPIREG:
-                    // Force SPI Mode 3: 00101100 CPOL=1, CPHA=1, SPI enabled
-                    write_SPIcontrol_register(0x2C);
-                    state = STATE_WAIT_INPUT;
-                    break;
         }
     }
 }
@@ -177,12 +146,8 @@ void setup() {
     GPIOB->PUPDR |=  (1 << (1 * 2)); // Set PB1 to pull-up mode (01)
 
     initSerial(9600);
-    SysTick->LOAD = 80000-1; // Systick clock = 80MHz. 80000000/80000=1000
-	SysTick->CTRL = 7; // enable systick counter and its interrupts
-	SysTick->VAL = 10; // start from a low number so we don't wait for ages for first interrupt
     initSPI(SPI1);
     __asm(" cpsie i "); // enable interrupts globally
-
 }
 
 /**

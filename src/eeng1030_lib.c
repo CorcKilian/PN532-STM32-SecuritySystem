@@ -45,7 +45,6 @@ void initClocks() {
     FLASH->ACR &= ~((1 << 2) + (1 << 1) + (1 << 0));
     FLASH->ACR |= (1 << 2); 
     RCC->CFGR |= (1 << 1) + (1 << 0); // Select PLL as system clock
-
 }
 
 /**
