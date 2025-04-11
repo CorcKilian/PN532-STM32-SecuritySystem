@@ -366,25 +366,61 @@ void read_SPIcontrol_register(void) {
  * Writes a value to the SPIcontrol register (0xFFA9) using the WriteRegister command.
  * This lets you change SPI settings like CPOL and CPHA to match other devices.
  *
- * Example: Setting value to 0x3F sets SPI Mode 3 (CPOL=1, CPHA=1) with SPI and IRQs enabled.
- *
+ * Example: Setting value to 0x3F sets SPI Mode 3 (CPOL=1, CPHA=1)
  * @param value The 8-bit value to write to the SPIcontrol register.
  */
 void write_SPIcontrol_register(uint8_t value) {
     uint8_t writereg_cmd[] = {
         PN532_COMMAND_WRITEREGISTER,  // 0x08
-        0x01,      // Number of registers to write
-        0xFF,      // High byte of address
-        0xA9,      // Low byte of address (SPIcontrol)
-        value      // Value to write
+        0xFF,
+        0xA9,
+        value
     };
 
+    // Send the command
     sendCommand(writereg_cmd, sizeof(writereg_cmd));
 
+    // Wait for ACK
     if (!PN532_readACK()) {
-        printf("❌ No ACK for WriteRegister.\r\n");
+        printf("❌ No ACK for WriteRegister command.\r\n");
         return;
     }
+    printf("✅ ACK received for WriteRegister.\r\n");
+    // set the approptiate SPIMode
+    SetSPIMode((value >> 3) & 0x01, (value >> 2) & 0x01);
 
-    printf("✅ Wrote 0x%02X to SPIcontrol (0xA9).\r\n", value);
+
+
+    // Read response (no new command needed)
+    uint8_t rx_buf[PN532_MAX_FRAME_LEN] = {0};
+    uint8_t rx_len = 0;
+
+    if (PN532_readResponse(rx_buf, &rx_len)) {
+        if (rx_len >= 1 && rx_buf[0] == PN532_COMMAND_WRITEREGISTER + 1) {
+            printf("✅ WriteRegister response received.\r\n");
+        } else {
+            printf("⚠️ Unexpected WriteRegister response:\r\n");
+            for (uint8_t i = 0; i < rx_len; i++) {
+                printf("  RX[%u] = 0x%02X\r\n", i, rx_buf[i]);
+            }
+        }
+    } else {
+        printf("❌ Failed to read WriteRegister response.\r\n");
+    }
+}
+
+
+void sendACK(void)
+{
+    PN532_SS_LOW();
+    delayPN(PN532_Delay80MHZ);  // Ensure PN532 is awake
+    transferSPI8(SPI1, 0x01);
+    transferSPI8(SPI1, 0x00);
+    transferSPI8(SPI1, 0x00);
+    transferSPI8(SPI1, 0xFF);
+    transferSPI8(SPI1, 0x00);
+    transferSPI8(SPI1, 0xFF);
+    transferSPI8(SPI1, 0x00);
+    PN532_SS_HIGH();
+    
 }

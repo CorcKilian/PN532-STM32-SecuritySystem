@@ -40,6 +40,34 @@ void initSPI(SPI_TypeDef *spi) {
     spi->CR2 = (1 << 10) + (1 << 9) + (1 << 8); // configure for 8-bit operation
 }
 
+void initSPIMode3(SPI_TypeDef *spi) {
+    /*
+        I/O List:
+        PA7  : SPI1 MOSI : Alternative function 5		
+        PA1  : SPI1 SCLK : Alternative function 5    
+        PA11 : SPI1 MISO : Alternative function 5
+    */
+
+    int drain;	
+    RCC->APB2ENR |= (1 << 12); // turn on SPI1
+
+    // Now configure the SPI interface        
+    pinMode(GPIOA, 7, 2);        
+    pinMode(GPIOA, 1, 2);
+    pinMode(GPIOA, 11, 2);
+    selectAlternateFunction(GPIOA, 7, 5);        
+    selectAlternateFunction(GPIOA, 1, 5);
+    selectAlternateFunction(GPIOA, 11, 5);
+
+    drain = spi->SR; // dummy read of SR to clear MODF	
+
+    // enable SSM, set SSI, enable SPI, PCLK/2, MSB First Master   
+    spi->CR1 = (1 << 9) + (1 << 8) + (1 << 7) + (1 << 6) + (1 << 2) + (1 << 3) + (1 << 5) + (1 << 4); 
+    spi->CR1 |= (1 << 0); // ensuring correct settings for display
+    spi->CR1 |= (1 << 1); 
+    spi->CR2 = (1 << 10) + (1 << 9) + (1 << 8); // configure for 8-bit operation
+}
+
 /**
  * transferSPI8
  *
@@ -132,4 +160,16 @@ char waitForByte_USART2(void) {
  */
 void delaySPI(volatile uint32_t dly) {
     while (dly--);
+}
+void SetSPIMode(uint8_t cpha, uint8_t cpol)
+{
+
+    // Clear CPHA (bit 0) and CPOL (bit 1)
+    SPI1->CR1 &= ~((1 << 0) | (1 << 1));
+
+    // Set CPHA and CPOL based on input
+    SPI1->CR1 |= ((cpha & 0x01) << 0) | ((cpol & 0x01) << 1);
+    //need to send two bytes before sending actual info, else it will send the first 2 bytes as garbage.	
+    transferSPI8(SPI1,0xFF);
+    transferSPI8(SPI1,0xFF); 
 }

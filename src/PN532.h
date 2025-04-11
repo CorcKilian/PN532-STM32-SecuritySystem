@@ -15,7 +15,8 @@ bool PN532_readACK(void);
 void delayPN_ms(uint32_t ms);
 void delayPN(volatile uint32_t dly);
 void read_SPIcontrol_register(void);
-
+void write_SPIcontrol_register(uint8_t value);
+void sendACK(void);
 
 typedef struct {
     uint8_t nb_targets;        // Number of tags detected
